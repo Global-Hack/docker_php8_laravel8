@@ -1,4 +1,4 @@
-FROM php:8.0.13-fpm-alpine
+FROM php:8.0-fpm-alpine
 
 COPY ./www/exec /work/exec
 RUN chmod 777 /work/exec
@@ -17,22 +17,24 @@ ENV LANG=ja_JP.UTF-8
 RUN apk add tzdata && \
     cp /usr/share/zoneinfo/Asia/Tokyo /etc/localtime
 
-RUN apk add --no-cache mysql-client msmtp perl wget procps shadow libzip libpng libjpeg-turbo libwebp freetype icu
+RUN apk upgrade --update && \
+  apk --no-cache add icu-dev autoconf make g++ gcc ca-certificates wget curl
 
-RUN apk add --no-cache --virtual build-essentials \
-    icu-dev icu-libs zlib-dev g++ make automake autoconf libzip-dev \
-    libpng-dev libwebp-dev libjpeg-turbo-dev freetype-dev && \
-    docker-php-ext-configure gd --enable-gd --with-freetype --with-jpeg --with-webp && \
-    apk del build-essentials && rm -rf /usr/src/php*
+# for gd
+RUN apk add --no-cache \
+        freetype-dev \
+        libjpeg-turbo-dev \
+        libpng-dev
 
 # for imap
 RUN apk add imap-dev krb5-dev libressl-dev
 
 # 使用するモジュール追加
-RUN apk add --no-cache php8-bcmath php8-pecl-memcached unzip less
+RUN apk add --no-cache php8-bcmath php8-pecl-memcached unzip libzip-dev less
 RUN docker-php-ext-install intl pdo_mysql opcache zip bcmath exif
-RUN docker-php-ext-configure gd --with-freetype-dir=/usr/include/ --with-jpeg-dir=/usr/include/ \
-    && docker-php-ext-install gd
+
+RUN docker-php-ext-configure gd --with-jpeg
+RUN docker-php-ext-install -j$(nproc) gd
     
 # for imap
 RUN PHP_OPENSSL=yes \
