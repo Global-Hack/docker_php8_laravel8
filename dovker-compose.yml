@@ -1,0 +1,62 @@
+version: "3.8"
+volumes:
+  php-fpm-socket:
+  db-store:
+services:
+  db:
+    image: mysql:5.7
+    container_name: db
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: system_mtc
+      MYSQL_USER: docker_user
+      MYSQL_PASSWORD: docker_pass
+      TZ: 'Asia/Tokyo'
+    command: mysqld --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    volumes:
+    - ./infra/docker/mysql/db-store:/var/lib/mysql
+    - ./infra/docker/mysql/my.cnf:/etc/mysql/conf.d/my.cnf
+    - ./infra/docker/mysql/sql:/docker-entrypoint-initdb.d
+    ports:
+    - 3306:3306
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    depends_on:
+      - db
+    environment:
+      - PMA_ARBITRARY=1
+      - PMA_HOSTS=db
+      - PMA_USER=docker_user
+      - PMA_PASSWORD=docker_pass
+    ports:
+      - 8080:80
+    volumes:
+      - ./docker/phpmyadmin/sessions:/sessions
+  web:
+    build:
+      context: .
+      dockerfile: ./infra/docker/nginx/Dockerfile
+    ports:
+      - ${WEB_PORT:-80}:80
+    volumes:
+      - php-fpm-socket:/var/run/php-fpm
+      - ./www/laravel:/work/www
+      - ./www/exec:/work/exec
+      # - ./www:/work/www/laravel
+  app:
+    build:
+      context: .
+      dockerfile: ./infra/docker/php/Dockerfile
+    volumes:
+      - php-fpm-socket:/var/run/php-fpm
+      - ./www/laravel:/work/www
+      # - ./www:/work/www/laravel
+    environment:
+       DB_CONNECTION: mysql
+       DB_HOST: db
+       DB_PORT: 3306
+       DB_DATABASE: system_mtc
+       DB_USERNAME: docker_user
+       DB_PASSWORD: docker_pass
+    links:
+      - db
